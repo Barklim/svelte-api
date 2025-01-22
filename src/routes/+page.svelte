@@ -5,42 +5,77 @@
 	import { fade } from 'svelte/transition';
 	import { getPosts } from '$lib/api/methods/posts';
 	import { getReasonPhrase } from 'http-status-codes';
+  import { onMount } from 'svelte';
 
 	/**
 	 * Components
 	 */
-	import Loader from '$lib/components/Loader.svelte';
+  import Loader from '$lib/components/Loader.svelte';
 
-	const loadData = async () => {
-		const response = await getPosts();
+  let posts = [];
+  let loading = true;
+  let errorMessage = "";
+  let notification = "";
 
-		if (!response.success) {
-			throw new Error(getReasonPhrase(response.data.code));
-		}
+  const LOCAL_STORAGE_KEY = "cachedPosts";
 
-		return response.data;
-	};
+  const loadData = async () => {
+    try {
+      const response = await getPosts();
 
+      if (!response.success) {
+        throw new Error(getReasonPhrase(response.data.code));
+      }
+
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(response.data));
+
+      return response.data;
+    } catch (error) {
+      const cachedPosts = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+      if (cachedPosts) {
+        notification = "Данные загружены из кеша.";
+        return JSON.parse(cachedPosts);
+      }
+
+      // If no data in cache or network
+      throw new Error("Нет данных для отображения.");
+    }
+  };
+
+  onMount(async () => {
+    try {
+      posts = await loadData();
+    } catch (error) {
+      errorMessage = error.message;
+    } finally {
+      loading = false;
+    }
+  });
 </script>
 
 <div class="layout">
 	<h1>Latest posts</h1>
 
-	{#await loadData()}
+	{#if loading}
 		<Loader />
-	{:then posts}
+  {:else if errorMessage}
+    <h1>Ошибка: {errorMessage}</h1>
+  {:else}
+    {#if notification}
+      <div class="notification">
+        {notification}
+      </div>
+    {/if}
 		<div class="posts">
 			{#each posts as post (post.id)}
-				<div class="posts__item"
-						 in:fade>
+      	<div class="posts__item" in:fade>
 					<h4>{post.title}</h4>
 					<p>{post.body}</p>
 				</div>
-			{/each}
-		</div>
-	{:catch e}
-		<h1>Errored: {e}</h1>
-	{/await}
+        {/each}
+    </div>
+  {/if}
 </div>
 
 
@@ -86,7 +121,7 @@
 
 
       h4 {
-        color: #2B302C;
+        color: #2b302c;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
