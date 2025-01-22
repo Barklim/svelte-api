@@ -11,8 +11,10 @@
 	 * Components
 	 */
   import Loader from '$lib/components/Loader.svelte';
+  import type { IPost } from '$lib/api/types/models/post';
+  import { ErrorUtils } from '$lib/utils/error';
 
-  let posts = [];
+  let posts: IPost[] = [];
   let loading = true;
   let errorMessage = "";
   let notification = "";
@@ -32,6 +34,18 @@
       return response.data;
     } catch (error) {
       const cachedPosts = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+      ErrorUtils.log(error, "Ошибка при загрузке данных");
+      const errorReason = ErrorUtils.getErrorReason(error);
+
+      // Type error checking
+      if (errorReason.data.isCanceled) {
+        console.warn("Запрос был отменен:", errorReason.data.message);
+      } else if (errorReason.data.isNetworkError) {
+        console.error("Сетевая ошибка:", errorReason.data.message);
+      } else {
+        console.error(`Something wrong: Ошибка ${errorReason.data.code} ${errorReason.data.message}`);
+      }
 
       if (cachedPosts) {
         notification = "Данные загружены из кеша.";
